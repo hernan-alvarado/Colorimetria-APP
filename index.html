@@ -1,1 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asesor de Colores Personalizados</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --background: #f8f9fa;
+        }
 
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            text-align: center;
+            background-color: var(--background);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        #container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+            transition: transform 0.3s ease;
+        }
+
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            cursor: pointer;
+        }
+
+        #preview {
+            margin-top: 1.5rem;
+            max-width: 300px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            margin: 1rem 0;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(52, 152, 219, 0.3);
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .color-card {
+            padding: 0.5rem;
+            border-radius: 8px;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            margin: 1rem 0;
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 480px) {
+            #container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Asesor de Colores Personalizados 👗🎨</h1>
+        
+        <div class="upload-section" onclick="document.getElementById('imageInput').click()">
+            <p>📤 Arrastra o selecciona tu foto aquí</p>
+            <input type="file" accept="image/*" id="imageInput" hidden>
+        </div>
+        
+        <img id="preview" alt="Vista previa de la imagen">
+        <div class="loading" id="loading">Analizando imagen...</div>
+
+        <div id="resultsSection" style="display: none;">
+            <h3>Tono de piel detectado: <span id="skinToneLabel"></span></h3>
+            <button onclick="showColors()">Ver recomendaciones</button>
+            <div id="colorResults" class="color-palette"></div>
+        </div>
+    </div>
+
+    <script>
+        const colorRecommendations = {
+            claro: {
+                name: "Piel Clara 👩🏻",
+                colors: [
+                    {name: "Azul cielo", hex: "#87CEEB"},
+                    {name: "Lavanda", hex: "#E6E6FA"},
+                    {name: "Rosa pálido", hex: "#FFB6C1"},
+                    {name: "Beige", hex: "#F5F5DC"},
+                    {name: "Gris perla", hex: "#D3D3D3"}
+                ]
+            },
+            medio: {
+                name: "Piel Media 👩🏽",
+                colors: [
+                    {name: "Verde esmeralda", hex: "#50C878"},
+                    {name: "Azul marino", hex: "#000080"},
+                    {name: "Rojo intenso", hex: "#C41E3A"},
+                    {name: "Mostaza", hex: "#FFDB58"},
+                    {name: "Terracota", hex: "#E2725B"}
+                ]
+            },
+            oscuro: {
+                name: "Piel Oscura 👩🏿",
+                colors: [
+                    {name: "Dorado", hex: "#FFD700"},
+                    {name: "Naranja profundo", hex: "#FF6600"},
+                    {name: "Violeta", hex: "#8A2BE2"},
+                    {name: "Verde oliva", hex: "#808000"},
+                    {name: "Burdeos", hex: "#800020"}
+                ]
+            }
+        };
+
+        function showColors() {
+            const skinTone = document.getElementById('skinToneLabel').dataset.tone;
+            const colorResults = document.getElementById('colorResults');
+            
+            colorResults.innerHTML = colorRecommendations[skinTone].colors
+                .map(color => `
+                    <div class="color-card" style="background-color: ${color.hex}">
+                        ${color.name}
+                    </div>
+                `).join('');
+        }
+
+        document.getElementById('imageInput').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showLoading(true);
+            try {
+                const img = await loadImage(file);
+                document.getElementById('preview').style.display = 'block';
+                document.getElementById('preview').src = img.src;
+                
+                const skinTone = await detectSkinTone(img);
+                showResults(skinTone);
+            } catch (error) {
+                alert('Error al procesar la imagen: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function detectSkinTone(img) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Configurar canvas
+                const scale = Math.min(1, 500 / Math.max(img.width, img.height));
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                // Muestrear área central (mejor detección de rostro)
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const sampleSize = 100;
+                const sampleData = ctx.getImageData(
+                    centerX - sampleSize/2, 
+                    centerY - sampleSize/2, 
+                    sampleSize, 
+                    sampleSize
+                ).data;
+
+                // Calcular promedio de color
+                let r = 0, g = 0, b = 0, count = 0;
+                for (let i = 0; i < sampleData.length; i += 4) {
+                    r += sampleData[i];
+                    g += sampleData[i+1];
+                    b += sampleData[i+2];
+                    count++;
+                }
+                
+                r = Math.round(r / count);
+                g = Math.round(g / count);
+                b = Math.round(b / count);
+
+                // Mejorado: Detección basada en modelo de color YCbCr
+                const y = 0.299 * r + 0.587 * g + 0.114 * b;
+                const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+                const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+                let skinTone;
+                if (y > 180 && cb > 85 && cb < 135 && cr > 135 && cr < 180) {
+                    skinTone = 'claro';
+                } else if (y > 120 && cb > 75 && cb < 130 && cr > 130 && cr < 175) {
+                    skinTone = 'medio';
+                } else {
+                    skinTone = 'oscuro';
+                }
+
+                resolve(skinTone);
+            });
+        }
+
+        function showResults(skinTone) {
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('skinToneLabel').textContent = colorRecommendations[skinTone].name;
+            document.getElementById('skinToneLabel').dataset.tone = skinTone;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
